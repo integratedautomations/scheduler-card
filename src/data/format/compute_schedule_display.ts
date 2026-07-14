@@ -1,4 +1,5 @@
 import { computeDomain, friendlyName } from "../../lib/entity";
+import { describeTarget, targetEntities, targetIsDynamic } from "../actions/target";
 import { HomeAssistant } from "../../lib/types";
 import { CustomConfig, DisplayItem, Schedule } from "../../types";
 import { computeTimeDisplay } from "./compute_time_display";
@@ -28,7 +29,11 @@ export const computeScheduleDisplay = (schedule: Schedule, config: (DisplayItem 
           : '';
       case DisplayItem.Entity:
         const nextAction = schedule.entries[0].slots[schedule.next_entries[0] || 0].actions[0];
-        let entityIds = [nextAction.target?.entity_id || []].flat();
+        if (targetIsDynamic(nextAction.target)) {
+          // show the target's own references (areas/floors/labels/devices)
+          return capitalizeFirstLetter(describeTarget(hass, nextAction.target));
+        }
+        let entityIds = targetEntities(nextAction.target);
         if (!entityIds.length && ['script', 'notify'].includes(computeDomain(nextAction.service))) entityIds = [nextAction.service];
         const entityDisplay = entityIds.map(e => computeEntityDisplay(e, hass, customize)).join(", ");
         return capitalizeFirstLetter(entityDisplay);

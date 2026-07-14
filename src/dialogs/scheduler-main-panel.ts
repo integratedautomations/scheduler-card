@@ -1,7 +1,7 @@
 import { mdiChevronLeft, mdiChevronRight, mdiDotsVertical, mdiPencil, mdiShapeRectanglePlus, mdiTrashCanOutline } from "@mdi/js";
 import { CSSResultGroup, LitElement, PropertyValues, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators";
-import { Action, CardConfig, EditorMode, Schedule, ScheduleEntry, TWeekday, Time, Timeslot } from "../types";
+import { Action, CardConfig, EditorMode, Schedule, ScheduleEntry, TWeekday, Target, Time, Timeslot } from "../types";
 import { actionConfig } from "../data/actions/action_config";
 import { formatWeekdayDisplay } from "../data/days";
 import { defaultSelectorValue } from "../data/selectors/default_selector_value";
@@ -27,16 +27,18 @@ import { hassLocalize } from "../localize/hassLocalize";
 import { isDefined } from "../lib/is_defined";
 import { moveTimeslot } from "../data/schedule/move_timeslot";
 import { computeEntityDisplay } from "../data/format/compute_entity_display";
+import { actionTargetEntities, buildTargetFilter, describeTarget, isEmptyTarget, normalizeTarget, targetEntities, targetIsDynamic } from "../data/actions/target";
 import { DEFAULT_TIME_STEP } from "../const";
 import { HassEntity } from "home-assistant-js-websocket";
 
 import "../components/scheduler-timeslot-editor";
 import "../components/scheduler-time-picker";
-import "../components/scheduler-entity-picker";
+import "../components/scheduler-target-picker";
 import '../dialogs/dialog-select-weekdays';
 import '../dialogs/dialog-select-action';
 import '../components/scheduler-collapsible-section';
 import '../components/scheduler-settings-row';
+import '../components/scheduler-conditions-editor';
 import '../components/scheduler-combo-selector';
 
 @customElement('scheduler-main-panel')
@@ -61,6 +63,18 @@ export class SchedulerMainPanel extends LitElement {
 
   render() {
     return html`
+    <div class="name-row">
+      <span>${hassLocalize('ui.common.name', this.hass)}:</span>
+      <ha-input
+        .value=${this.schedule.name || ''}
+        placeholder=${this.schedule.name
+      ? ''
+      : hassLocalize('ui.common.name', this.hass)}
+        @input=${this._updateName}
+        @change=${(ev: Event) => ev.stopPropagation()}
+      ></ha-input>
+    </div>
+
     ${this.schedule.entries.map((entry, num) => html`
       
       <div class="editor-header">
@@ -114,6 +128,14 @@ export class SchedulerMainPanel extends LitElement {
     `)}
 
     ${this.renderSlot()}
+
+    <scheduler-conditions-editor
+      .hass=${this.hass}
+      .config=${this.config}
+      .schedule=${this.schedule}
+      @change=${this._conditionsChanged}
+    >
+    </scheduler-conditions-editor>
     `;
   }
 
@@ -223,13 +245,14 @@ export class SchedulerMainPanel extends LitElement {
 
     let heading = '';
 
-    let entityIds = [action.target?.entity_id || []].flat();
-    if (!entityIds.length && ['notify', 'script'].includes(domain)) entityIds = [action.service];
-
-    if (entityIds.length) {
-      heading += entityIds.map(e => computeEntityDisplay(e, this.hass, this.config.customize)).join(", ");
-      heading += ': ';
+    let targetDisplay = '';
+    if (targetIsDynamic(action.target)) targetDisplay = describeTarget(this.hass, action.target);
+    else {
+      let entityIds = targetEntities(action.target);
+      if (!entityIds.length && ['notify', 'script'].includes(domain)) entityIds = [action.service];
+      targetDisplay = entityIds.map(e => computeEntityDisplay(e, this.hass, this.config.customize)).join(", ");
     }
+    if (targetDisplay.length) heading += targetDisplay + ': ';
     heading += formatActionDisplay(action, this.hass, this.config.customize, false, true);
 
     return html`
@@ -264,24 +287,24 @@ export class SchedulerMainPanel extends LitElement {
 
           ${config.target ? html`
           <scheduler-settings-row>
-            <span slot="heading">${hassLocalize("ui.components.entity.entity-picker.entity", this.hass)}</span>
-            <scheduler-entity-picker
+            <span slot="heading">${localize('ui.panel.editor.target', this.hass)}</span>
+            <scheduler-target-picker
               .hass=${this.hass}
-              .config=${this.config}
+              .cardConfig=${this.config}
               .domain=${domain}
+              .supportedFeatures=${config.supported_features}
               .filterFunc=${(stateObj: HassEntity) => config.supported_features ? ((stateObj.attributes.supported_features || 0) & config.supported_features) > 0 : true}
-              @value-changed=${this._selectEntity}
-              .value=${[action.target?.entity_id || []].flat()}
-              ?multiple=${true}
+              @value-changed=${this._selectTarget}
+              .value=${action.target || {}}
               ?disabled=${hasFixedEntity}
             >
-            </scheduler-entity-picker>
+            </scheduler-target-picker>
           </scheduler-settings-row>
           `
         : ''}
 
           ${fields.map(field => {
-          const selector = selectorConfig(action.service, action.target?.entity_id, field, this.hass!, this.config.customize);
+          const selector = selectorConfig(action.service, actionTargetEntities(this.hass, action), field, this.hass!, this.config.customize);
           if (selector === null) return '';
           let optional: boolean | undefined = config.fields![field].optional || ((selector as NumberSelector).number || {}).optional;
           const checked = optional ? Object.keys(action.service_data).includes(field) : true;
@@ -346,16 +369,20 @@ export class SchedulerMainPanel extends LitElement {
     }
   }
 
-  _selectEntity(ev: CustomEvent) {
-    const entity = ev.detail.value as string | string[] | undefined;
-    if (!entity) return;
+  _selectTarget(ev: CustomEvent) {
+    ev.stopPropagation();
+    const target = normalizeTarget(ev.detail.value as Target | undefined);
+    // stamp the card's include/exclude restrictions into the action, so
+    // dynamic targets only ever resolve to entities this card may control
+    const filter = targetIsDynamic(target) ? buildTargetFilter(this.config) : undefined;
 
+    // the target is shared by the actions of all slots of the schedule
     this.schedule.entries[this.selectedEntry!].slots.forEach((slot, idx) => {
       if (!slot.actions.length) return;
       let action: Action = {
-        ...slot.actions[0], target: {
-          entity_id: entity
-        }
+        ...slot.actions[0],
+        target: target || {},
+        target_filter: filter
       };
       this._updateSlot({ actions: [action] }, idx);
     });
@@ -372,7 +399,25 @@ export class SchedulerMainPanel extends LitElement {
     }
   }
 
-  _updateSelectedSlot(slot: number | null) {
+  _updateName(ev: InputEvent) {
+    // native input events must not reach the dialog's @change listener,
+    // which expects CustomEvents carrying a detail object
+    ev.stopPropagation();
+    const value = (ev.target as HTMLInputElement).value;
+    // store the raw value so the re-rendered binding always equals what is
+    // in the input (trimming here made the field eat spaces while typing);
+    // trimming happens at save time in exportSchedule
+    this.schedule = { ...this.schedule, name: value ?? '' };
+  }
+
+  _conditionsChanged(ev: CustomEvent) {
+    ev.stopPropagation();
+    // adopting the child's schedule triggers shouldUpdate, which re-dispatches
+    // the change upward to the editor dialog (same pattern as slot updates)
+    this.schedule = ev.detail.schedule;
+  }
+
+    _updateSelectedSlot(slot: number | null) {
     this.dispatchEvent(
       new CustomEvent('change', { detail: { selectedSlot: slot } })
     );
@@ -433,8 +478,8 @@ export class SchedulerMainPanel extends LitElement {
     this.schedule.entries.forEach(entry => {
       entry.slots.forEach(slot => {
         slot.actions.forEach(action => {
-          filteredEntities = [...filteredEntities, ...[action.target?.entity_id || []].flat()];
-          filteredDomains = [...filteredDomains, ...[computeDomain(action.service), ...[action.target?.entity_id || []].flat()].map(computeDomain)];
+          filteredEntities = [...filteredEntities, ...targetEntities(action.target)];
+          filteredDomains = [...filteredDomains, ...[computeDomain(action.service), ...targetEntities(action.target).map(computeDomain)]];
         });
       });
     });
@@ -459,7 +504,7 @@ export class SchedulerMainPanel extends LitElement {
       .then((res: Action | null) => {
         if (!res) return;
         const slot: Timeslot = { ...this.schedule.entries[this.selectedEntry!].slots[this.selectedSlot!] };
-        const target = this.schedule.entries[this.selectedEntry!].slots.find(e => e.actions.length ? e.actions[0].target?.entity_id : undefined);
+        const target = this.schedule.entries[this.selectedEntry!].slots.find(e => e.actions.length ? !isEmptyTarget(e.actions[0].target) : undefined);
         let action = { ...res };
         if (target && action.target) action = { ...action, target: target.actions[0].target };
         this._updateSlot({ actions: [action] });
@@ -510,6 +555,22 @@ export class SchedulerMainPanel extends LitElement {
     return css`
   :host {
     position: relative;
+  }
+  div.name-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  div.name-row > span {
+    white-space: nowrap;
+  }
+  div.name-row ha-input {
+    flex: 1;
+  }
+  scheduler-conditions-editor {
+    margin-top: 16px;
   }
   .two-column {
     display: flex;
