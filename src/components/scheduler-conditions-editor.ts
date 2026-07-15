@@ -61,11 +61,21 @@ export class SchedulerConditionsEditor extends LitElement {
         <span>${localize('ui.panel.options.conditions.header', this.hass)}:</span>
         ${this.schedule.entries[0].slots[0].conditions.items.length
         ? html`
-        <ha-dropdown
-          @wa-select=${this._conditionConfigOptionsClick}
-          @wa-after-hide=${(ev: Event) => { ((ev.target as HTMLElement).firstElementChild as HTMLElement).blur() }}
-          placement="bottom-end"
-        >
+        <div class="condition-config">
+          <span class="condition-mode">
+            ${localize(
+          this.schedule.entries[0].slots[0].conditions.type == TConditionLogicType.And
+            ? 'ui.panel.options.conditions.options.logic_and_short'
+            : 'ui.panel.options.conditions.options.logic_or_short',
+          this.hass)}${this.schedule.entries[0].slots[0].conditions.track_changes
+            ? html`, ${localize('ui.panel.options.conditions.options.track_changes_short', this.hass)}`
+            : ''}
+          </span>
+          <ha-dropdown
+            @wa-select=${this._conditionConfigOptionsClick}
+            @wa-after-hide=${(ev: Event) => { ((ev.target as HTMLElement).firstElementChild as HTMLElement).blur() }}
+            placement="bottom-end"
+          >
           <ha-icon-button
             slot="trigger"
             .path=${mdiCog}
@@ -98,7 +108,8 @@ export class SchedulerConditionsEditor extends LitElement {
             ></ha-icon>
             ${localize('ui.panel.options.conditions.options.track_changes', this.hass)}
           </ha-dropdown-item>
-        </ha-dropdown>
+          </ha-dropdown>
+        </div>
         `
         : ''}
         </div>
@@ -409,6 +420,16 @@ export class SchedulerConditionsEditor extends LitElement {
       }
       .header ha-dropdown {
         margin-bottom: -10px;
+      }
+      .condition-config {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .condition-mode {
+        color: var(--secondary-text-color);
+        font-size: 0.9em;
+        white-space: nowrap;
       }
     `;
   }

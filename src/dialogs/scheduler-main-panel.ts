@@ -1,4 +1,4 @@
-import { mdiChevronLeft, mdiChevronRight, mdiDotsVertical, mdiPencil, mdiShapeRectanglePlus, mdiTrashCanOutline } from "@mdi/js";
+import { mdiCalendarEdit, mdiChevronLeft, mdiChevronRight, mdiDotsVertical, mdiPencil, mdiShapeRectanglePlus, mdiTrashCanOutline } from "@mdi/js";
 import { CSSResultGroup, LitElement, PropertyValues, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import { Action, CardConfig, EditorMode, Schedule, ScheduleEntry, TWeekday, Target, Time, Timeslot } from "../types";
@@ -83,7 +83,7 @@ export class SchedulerMainPanel extends LitElement {
             ${localize('ui.panel.editor.repeated_days', this.hass)}:
             ${formatWeekdayDisplay(entry.weekdays, 'short', this.hass)}
           </span>
-          <ha-icon-button .path=${mdiPencil} @click=${(ev: Event) => this._showWeekdayDialog(ev, num)}></ha-icon-button>
+          <ha-icon-button .path=${mdiCalendarEdit} @click=${(ev: Event) => this._showWeekdayDialog(ev, num)}></ha-icon-button>
         </div>
         <div class="weekdays-actions">
         <ha-button appearance="plain" size="small" @click=${this.toggleViewMode}>

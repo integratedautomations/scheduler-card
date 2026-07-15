@@ -168,7 +168,10 @@
           "options": {
             "logic_and": "All conditions must be true",
             "logic_or": "Any condition must be true",
-            "track_changes": "Re-evaluate when conditions change"
+            "track_changes": "Re-evaluate when conditions change",
+            "logic_and_short": "Match all",
+            "logic_or_short": "Match any",
+            "track_changes_short": "tracking"
           }
         },
         "period": {
