@@ -16,8 +16,13 @@ export const computeScheduleDisplay = (schedule: Schedule, config: (DisplayItem 
 
     switch (item) {
       case DisplayItem.Action:
-        const action = schedule.entries[0].slots[schedule.next_entries[0] || 0].actions[0];
-        return capitalizeFirstLetter(formatActionDisplay(action, hass, customize));
+        const slotActions = schedule.entries[0].slots[schedule.next_entries[0] || 0].actions;
+        const action = slotActions[0];
+        let actionDisplay = capitalizeFirstLetter(formatActionDisplay(action, hass, customize));
+        if (slotActions.length > 1) {
+          actionDisplay += ' +' + localize('ui.panel.overview.additional_tasks', hass, '{number}', String(slotActions.length - 1));
+        }
+        return actionDisplay;
       case DisplayItem.Days:
         return capitalizeFirstLetter(formatWeekdayDisplay(schedule.entries[0].weekdays, 'long', hass));
       case DisplayItem.Name:

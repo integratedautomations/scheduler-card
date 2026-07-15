@@ -131,19 +131,29 @@ export const convertLegacySchedule = (input: LegacySchedule): ScheduleStorageEnt
 
 const computeUniqueActions = (actions: Action[]): Action[] => {
   //combine the targets of actions that are otherwise identical
-  //(legacy storage kept one action per targeted entity)
-  if (actions.length == 1) return actions;
+  //(legacy storage kept one action per targeted entity); actions with
+  //differing service/service_data remain separate list entries
+  if (actions.length <= 1) return actions;
 
-  if (actions.every(e => deepCompare({ ...e, target: undefined, target_filter: undefined }, { ...actions[0], target: undefined, target_filter: undefined }))) {
+  let groups: Action[][] = [];
+  actions.forEach(action => {
+    const group = groups.find(g =>
+      deepCompare({ ...g[0], target: undefined, target_filter: undefined }, { ...action, target: undefined, target_filter: undefined })
+    );
+    if (group) group.push(action);
+    else groups.push([action]);
+  });
+
+  return groups.map(group => {
+    if (group.length == 1) return group[0];
     let merged: Target = {};
     TARGET_KEYS.forEach(key => {
-      const values = [...new Set(actions.map(e => [e.target?.[key] || []].flat()).flat())];
+      const values = [...new Set(group.map(e => [e.target?.[key] || []].flat()).flat())];
       if (values.length) merged = { ...merged, [key]: values.sort() };
     });
-    let output: Action = { ...actions[0], target: merged };
-    const filter = actions.map(e => e.target_filter).find(e => e);
+    let output: Action = { ...group[0], target: merged };
+    const filter = group.map(e => e.target_filter).find(e => e);
     if (filter) output = { ...output, target_filter: filter };
-    return [output];
-  }
-  return actions;
+    return output;
+  });
 }
