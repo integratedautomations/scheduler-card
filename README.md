@@ -579,6 +579,7 @@ The following properties are available:
 | `days`             | Configured days for the schedule.                                                                                                                  |
 | `additional-tasks` | The amount of remaining tasks/actions (other than the displayed one).<br>Only for time schemes, otherwise this property is skipped.                |
 | `tags`             | Show tags assigned to schedule. See [tags](#tags).                                                                                                 |
+| `conditions`       | Summary of the conditions of the schedule (e.g. `Issur Melucha = On`), joined by the configured match mode.<br>Only if conditions are defined, otherwise this property is skipped. |
 
 <sup>1</sup> For *time schemes*, the displayed value corresponds to the closest timeslot.
 

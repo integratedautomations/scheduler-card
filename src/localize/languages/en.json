@@ -171,6 +171,8 @@
             "track_changes": "Re-evaluate when conditions change",
             "logic_and_short": "Match all",
             "logic_or_short": "Match any",
+            "logic_and_join": "and",
+            "logic_or_join": "or",
             "track_changes_short": "tracking"
           }
         },
@@ -237,7 +239,8 @@
               "relative_time": "Time remaining until next action",
               "time": "Configured time for next action",
               "days": "Repeated days of the week",
-              "additional_tasks": "Number of additional tasks"
+              "additional_tasks": "Number of additional tasks",
+              "conditions": "Summary of conditions"
             }
           },
           "show_header_toggle": {

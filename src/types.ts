@@ -130,6 +130,7 @@ export enum DisplayItem {
   Entity = 'entity',
   Action = 'action',
   Tags = 'tags',
+  Conditions = 'conditions',
   Default = 'default'
 }
 

@@ -8,6 +8,7 @@ import { localize } from "../../localize/localize";
 import { capitalizeFirstLetter } from "../../lib/capitalize_first_letter";
 import { formatWeekdayDisplay } from "../days";
 import { computeEntityDisplay } from "./compute_entity_display";
+import { formatConditionsDisplay } from "./format_condition_display";
 
 
 export const computeScheduleDisplay = (schedule: Schedule, config: (DisplayItem | string)[] | DisplayItem | string, hass: HomeAssistant, customize?: CustomConfig): string[] => {
@@ -46,6 +47,11 @@ export const computeScheduleDisplay = (schedule: Schedule, config: (DisplayItem 
         return '<relative-time></relative-time>';
       case DisplayItem.Tags:
         return schedule.tags?.map(e => `<tag>${e}</tag>`).join('');
+      case DisplayItem.Conditions:
+        // conditions are shared by all slots of a schedule, but read them off
+        // the upcoming slot to stay consistent with the other display items
+        const conditionSlot = schedule.entries[0].slots[schedule.next_entries[0] || 0];
+        return formatConditionsDisplay(conditionSlot?.conditions, hass, customize);
       case DisplayItem.Time:
         const slot = schedule.entries[0].slots[schedule.next_entries[0] || 0];
         const timeDisplay = computeTimeDisplay(slot.start, slot.stop, hass);
