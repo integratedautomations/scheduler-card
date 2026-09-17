@@ -196,14 +196,18 @@ export class SchedulerItemRow extends LitElement {
         flex-wrap: wrap;
       }
       .secondary .conditions-list {
+        display: grid;
+        grid-template-columns: minmax(1.5em, auto) 1fr;
+        column-gap: 6px;
         white-space: normal;
         overflow: visible;
         text-overflow: clip;
       }
       .condition-row {
-        display: grid;
-        grid-template-columns: minmax(1.5em, auto) 1fr;
-        column-gap: 6px;
+        /* not a grid itself: 'contents' hands its two children straight to
+           the parent's grid, so the divider column is sized once across all
+           rows instead of independently (and misaligned) per row */
+        display: contents;
       }
       .condition-prefix {
         text-align: right;

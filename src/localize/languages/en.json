@@ -173,6 +173,7 @@
             "logic_or_short": "Match any",
             "logic_and_join": "and",
             "logic_or_join": "or",
+            "logic_if": "if",
             "track_changes_short": "tracking"
           }
         },

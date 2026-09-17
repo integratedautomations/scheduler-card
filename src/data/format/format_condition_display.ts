@@ -36,8 +36,8 @@ export const formatConditionDisplay = (condition: Partial<Condition>, hass: Home
 /**
  * Summary of all conditions of a timeslot, joined by the configured logic mode.
  * A single condition renders as plain text, e.g. "Issur Melucha = On".
- * Multiple conditions render as one row per condition (each headed by the
- * logic word, blank on the first row) so long conditions no longer get cut
+ * Multiple conditions render as one row per condition ("if" on the first row,
+ * the logic word on every row after) so long conditions no longer get cut
  * off by being squeezed onto a single line - the markup is picked up by
  * scheduler-item-row's unsafeHTML rendering, styled by its '.condition-*' CSS.
  */
@@ -50,6 +50,7 @@ export const formatConditionsDisplay = (conditions: ConditionConfig | undefined,
   if (!parts.length) return '';
   if (parts.length === 1) return parts[0];
 
+  const ifWord = localize('ui.panel.options.conditions.options.logic_if', hass);
   const joinWord = localize(
     conditions?.type == TConditionLogicType.Or
       ? 'ui.panel.options.conditions.options.logic_or_join'
@@ -58,7 +59,7 @@ export const formatConditionsDisplay = (conditions: ConditionConfig | undefined,
   );
 
   const rows = parts
-    .map((text, i) => `<div class="condition-row"><span class="condition-prefix">${i === 0 ? '' : joinWord}</span><span class="condition-text">${text}</span></div>`)
+    .map((text, i) => `<div class="condition-row"><span class="condition-prefix">${i === 0 ? ifWord : joinWord}</span><span class="condition-text">${text}</span></div>`)
     .join('');
 
   return `<div class="conditions-list">${rows}</div>`;
