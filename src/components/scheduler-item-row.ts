@@ -195,6 +195,27 @@ export class SchedulerItemRow extends LitElement {
         gap: 5px;
         flex-wrap: wrap;
       }
+      .secondary .conditions-list {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+      .condition-row {
+        display: grid;
+        grid-template-columns: minmax(1.5em, auto) 1fr;
+        column-gap: 6px;
+      }
+      .condition-prefix {
+        text-align: right;
+        text-transform: uppercase;
+        border-right: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+        padding-right: 6px;
+      }
+      .condition-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
       span.tag {
         height: 28px;
         border-radius: 14px;
