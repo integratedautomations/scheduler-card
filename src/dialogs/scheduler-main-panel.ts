@@ -290,8 +290,7 @@ export class SchedulerMainPanel extends LitElement {
         <div slot="content">
 
           ${config.target ? html`
-          <scheduler-settings-row>
-            <span slot="heading">${localize('ui.panel.editor.target', this.hass)}</span>
+          <div class="target-row">
             <scheduler-target-picker
               .hass=${this.hass}
               .cardConfig=${this.config}
@@ -303,7 +302,7 @@ export class SchedulerMainPanel extends LitElement {
               ?disabled=${hasFixedEntity}
             >
             </scheduler-target-picker>
-          </scheduler-settings-row>
+          </div>
           `
         : ''}
 
@@ -654,6 +653,11 @@ export class SchedulerMainPanel extends LitElement {
   }
   div.slot-placeholder {
     padding: 20px 0px 0px 0px;
+  }
+  div.target-row {
+    display: block;
+    width: 100%;
+    padding: 8px 0;
   }
   scheduler-collapsible-section .header ha-icon {
     margin-right: 6px;

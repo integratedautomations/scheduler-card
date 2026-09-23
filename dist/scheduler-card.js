@@ -2412,8 +2412,7 @@ var se,ae;class oe extends f{constructor(){super(...arguments),this.renderOption
         <div slot="content">
 
           ${o.target?q`
-          <scheduler-settings-row>
-            <span slot="heading">${ls("ui.panel.editor.target",this.hass)}</span>
+          <div class="target-row">
             <scheduler-target-picker
               .hass=${this.hass}
               .cardConfig=${this.config}
@@ -2425,7 +2424,7 @@ var se,ae;class oe extends f{constructor(){super(...arguments),this.renderOption
               ?disabled=${r}
             >
             </scheduler-target-picker>
-          </scheduler-settings-row>
+          </div>
           `:""}
 
           ${d.map(i=>{const s=js(e.service,Re(this.hass,e),i,this.hass,this.config.customize);if(null===s)return"";let a=o.fields[i].optional||(s.number||{}).optional;const n=!a||Object.keys(e.service_data).includes(i);return q`
@@ -2516,6 +2515,11 @@ var se,ae;class oe extends f{constructor(){super(...arguments),this.renderOption
   }
   div.slot-placeholder {
     padding: 20px 0px 0px 0px;
+  }
+  div.target-row {
+    display: block;
+    width: 100%;
+    padding: 8px 0;
   }
   scheduler-collapsible-section .header ha-icon {
     margin-right: 6px;
@@ -3080,4 +3084,4 @@ var se,ae;class oe extends f{constructor(){super(...arguments),this.renderOption
     .card-actions, .card-actions > * { 
       display: flex;
     }
-  `,t([ce({attribute:!1})],e.SchedulerCard.prototype,"hass",void 0),t([ce()],e.SchedulerCard.prototype,"_config",void 0),t([ue()],e.SchedulerCard.prototype,"schedules",void 0),t([ue()],e.SchedulerCard.prototype,"showDiscovered",void 0),e.SchedulerCard=t([de("scheduler-card")],e.SchedulerCard),window.customCards=window.customCards||[],window.customCards.push({type:"scheduler-card",name:"Scheduler Card",description:"Card to manage schedule entities made with scheduler-component."}),console.info("%c  SCHEDULER-CARD  \n%c  Version: "+"v4.0.22".padEnd(7," "),"color: orange; font-weight: bold; background: black","color: white; font-weight: bold; background: dimgray")}({});
+  `,t([ce({attribute:!1})],e.SchedulerCard.prototype,"hass",void 0),t([ce()],e.SchedulerCard.prototype,"_config",void 0),t([ue()],e.SchedulerCard.prototype,"schedules",void 0),t([ue()],e.SchedulerCard.prototype,"showDiscovered",void 0),e.SchedulerCard=t([de("scheduler-card")],e.SchedulerCard),window.customCards=window.customCards||[],window.customCards.push({type:"scheduler-card",name:"Scheduler Card",description:"Card to manage schedule entities made with scheduler-component."}),console.info("%c  SCHEDULER-CARD  \n%c  Version: "+"v4.0.23".padEnd(7," "),"color: orange; font-weight: bold; background: black","color: white; font-weight: bold; background: dimgray")}({});
