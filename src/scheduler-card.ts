@@ -1,4 +1,4 @@
-import { css, html, LitElement, PropertyValues } from "lit";
+import { css, html, LitElement, nothing, PropertyValues } from "lit";
 import { loadHaForm } from './lib/load_ha_form';
 import { customElement, property, state } from "lit/decorators";
 import { SchedulerDialogParams } from "./dialogs/dialog-scheduler-editor";
@@ -17,6 +17,7 @@ import { fireEvent } from "./lib/fire_event";
 import { hassLocalize } from "./localize/hassLocalize";
 import { loadConfigFromEntityRegistry } from "./data/load_config_from_entity_registry";
 import { isDefined } from "./lib/is_defined";
+import { EntityScheduleMatch, EntityScheduleSummary, subscribeEntitySchedules } from "./data/store/subscribe_entity_schedules";
 
 import './scheduler-card-editor';
 import "./dialogs/dialog-scheduler-editor";
@@ -39,9 +40,27 @@ export class SchedulerCard extends LitElement {
 
   private __unsubs?: Array<UnsubscribeFunc | Promise<UnsubscribeFunc>>;
 
+  // entity mode state
+  @state() private _entityMatches: Record<string, EntityScheduleMatch | undefined> = {};
+  private _entityLoadId = 0;
+  private _subscribedEntity?: string;
+
   async setConfig(userConfig: CardConfig) {
     userConfig = validateConfig(userConfig);
     this._config = { ...userConfig };
+
+    // an embedding container may reuse the card for another entity:
+    // drop the old entity's subscription and data, then subscribe afresh
+    if (this.__unsubs !== undefined && this._subscribedEntity !== (this._config.entity_id || undefined)) {
+      this.__unsubscribeAll();
+      this.schedules = undefined;
+      this._entityMatches = {};
+      this.__checkSubscribed();
+    }
+  }
+
+  private get _entityMode(): boolean {
+    return Boolean(this._config.entity_id);
   }
 
   async firstUpdated() {
@@ -79,6 +98,11 @@ export class SchedulerCard extends LitElement {
 
   public disconnectedCallback() {
     super.disconnectedCallback();
+    this.__unsubscribeAll();
+  }
+
+  private __unsubscribeAll() {
+    this._entityLoadId++; // discard fetches still in flight for the old subscription
     if (this.__unsubs) {
       while (this.__unsubs.length) {
         const unsub = this.__unsubs.pop()!;
@@ -97,15 +121,76 @@ export class SchedulerCard extends LitElement {
     if (changedProps.has('hass')) {
       this.__checkSubscribed();
     }
+    // entity mode: flag "nothing to show" (also while still loading, so an
+    // embedding container never flashes an empty card)
+    if (this._entityMode) this.toggleAttribute('empty', !this.schedules?.length);
+    else if (this.hasAttribute('empty')) this.removeAttribute('empty');
   }
 
   public hassSubscribe(): Promise<UnsubscribeFunc>[] {
+    if (this._entityMode) return this.hassSubscribeEntity();
+    this._subscribedEntity = undefined;
     this.loadSchedules();
     return [
       this.hass!.connection.subscribeMessage((ev: SchedulerEventData) => this.handleScheduleItemUpdated(ev), {
         type: 'scheduler_updated',
       }),
     ];
+  }
+
+  // entity mode: the backend decides which schedules act on the entity (it
+  // can resolve area/floor/label/device membership, which local
+  // include/exclude filtering can't); scheduler_updated keeps the content of
+  // the listed schedules fresh between membership pushes
+  private hassSubscribeEntity(): Promise<UnsubscribeFunc>[] {
+    const entityId = this._config.entity_id!;
+    this._subscribedEntity = entityId;
+    return [
+      subscribeEntitySchedules(this.hass!, entityId, summaries => this._handleEntitySchedules(summaries))
+        .catch(err => {
+          // e.g. a backend without the entity commands: render nothing
+          console.warn(`scheduler-card: could not load schedules for ${entityId}`, err);
+          this._entityMatches = {};
+          this.schedules = [];
+          return () => { };
+        }),
+      this.hass!.connection.subscribeMessage((ev: SchedulerEventData) => this._handleEntityScheduleUpdated(ev), {
+        type: 'scheduler_updated',
+      }),
+    ];
+  }
+
+  private _handleEntitySchedules(summaries: EntityScheduleSummary[]) {
+    const loadId = ++this._entityLoadId;
+    const matches = Object.fromEntries(summaries.map(e => [e.schedule_id, e.matched_via]));
+    // rows need the full schedule, which the summaries don't carry
+    Promise.all(summaries.map(e => fetchScheduleItem(this.hass!, e.schedule_id).catch(() => null)))
+      .then(items => {
+        if (loadId !== this._entityLoadId) return; // superseded by a newer push or unsubscribed
+        this._entityMatches = matches;
+        this.schedules = sortSchedules(items.filter(isDefined) as ScheduleStorageEntry[], this._config, this.hass);
+      });
+  }
+
+  private _handleEntityScheduleUpdated(ev: SchedulerEventData) {
+    if (!this.schedules) return;
+    if (ev.event == 'scheduler_item_removed') {
+      this.schedules = this.schedules.filter(e => e.schedule_id !== ev.schedule_id);
+      return;
+    }
+    // membership only changes through the entity subscription
+    if (!(ev.schedule_id in this._entityMatches)) return;
+    const loadId = this._entityLoadId;
+    fetchScheduleItem(this.hass!, ev.schedule_id)
+      .then(schedule => {
+        if (!schedule || loadId !== this._entityLoadId || !this.schedules) return;
+        const idx = this.schedules.findIndex(e => e.schedule_id == ev.schedule_id);
+        if (idx < 0) return;
+        const schedules = [...this.schedules];
+        schedules[idx] = schedule;
+        this.schedules = sortSchedules(schedules, this._config, this.hass);
+      })
+      .catch(() => { });
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
@@ -115,8 +200,13 @@ export class SchedulerCard extends LitElement {
 
     if (oldConfig && this._config) {
       const changedKeys = Object.keys(oldConfig).filter(e => oldConfig[e] !== this._config![e]);
-      if (changedKeys.some(e => ['tags', 'discover_existing', 'sort_by', 'display_options'].includes(e)))
-        (async () => await this.loadSchedules())();
+      if (changedKeys.some(e => ['tags', 'discover_existing', 'sort_by', 'display_options'].includes(e))) {
+        // entity mode must not load the full list; its membership comes from the subscription
+        if (this._entityMode) {
+          if (this.schedules) this.schedules = sortSchedules([...this.schedules], this._config, this.hass);
+        }
+        else (async () => await this.loadSchedules())();
+      }
     }
 
     if (!this.translationsLoaded
@@ -138,6 +228,8 @@ export class SchedulerCard extends LitElement {
   }
 
   render() {
+    if (this._entityMode) return this.renderEntityMode();
+
     let items: ScheduleStorageEntry[] = [...this.schedules || []];
     let includedItems = items.filter(e => isIncludedSchedule(e, this._config, this.hass));
     let excludedItems = items.filter(e => !isIncludedSchedule(e, this._config, this.hass));
@@ -261,6 +353,33 @@ export class SchedulerCard extends LitElement {
     `;
   }
 
+  // compact list for embedding (e.g. in the more-info dialog): no title,
+  // header toggle, add button or excluded-items expander, and no card
+  // border/shadow. With nothing to show it renders nothing at all, so the
+  // container can treat an empty card as "hide me" (see also the [empty]
+  // host attribute and getCardSize() == 0)
+  private renderEntityMode() {
+    const items = this.schedules || [];
+    if (!items.length) return nothing;
+    return html`
+      <ha-card class="entity-mode">
+        <div class="card-content" id="states">
+          ${items.map(scheduleItem => html`
+            <scheduler-item-row
+              .hass=${this.hass}
+              .config=${this._config}
+              .schedule_id=${scheduleItem.schedule_id}
+              .schedule=${scheduleItem}
+              .matchedVia=${this._entityMatches[scheduleItem.schedule_id]}
+              @editClick=${(ev: Event) => { this._handleEditClick(ev, scheduleItem) }}
+            >
+            </scheduler-item-row>
+          `)}
+        </div>
+      </ha-card>
+    `;
+  }
+
   private async loadSchedules(): Promise<void> {
     fetchItems(this.hass!)
       .then(res => {
@@ -278,6 +397,13 @@ export class SchedulerCard extends LitElement {
       const wait = setInterval(() => {
         retries++;
         if (!this._config || (!this.schedules && !this.connectionError && retries < 50)) return;
+        if (this._entityMode) {
+          const rows = this.schedules?.length || 0;
+          const entityRowSize = (([this._config.display_options?.secondary_info || []].flat().length || 2) + 2) / 2;
+          clearInterval(wait);
+          res(Math.round(rows * entityRowSize));
+          return;
+        }
         let cardSize = this._config!.title || this._config!.show_header_toggle ? 3 : 1;
         if (this._config.show_add_button) cardSize += 1;
         const rowSize = (([this._config.display_options?.secondary_info || []].flat().length || 2) + 1) / 2;
@@ -379,6 +505,19 @@ export class SchedulerCard extends LitElement {
   }
 
   static styles = css`
+    :host([empty]) {
+      display: none;
+    }
+    ha-card.entity-mode {
+      --ha-card-border-width: 0;
+      --ha-card-box-shadow: none;
+      border: none;
+      box-shadow: none;
+      background: none;
+    }
+    ha-card.entity-mode .card-content {
+      padding: 0;
+    }
     .card-header {
       display: flex;
       justify-content: space-between;

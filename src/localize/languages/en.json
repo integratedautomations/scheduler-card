@@ -134,7 +134,18 @@
         "backend_error": "Could not connect with the scheduler component. It needs to be installed as integration before this card can be used.",
         "excluded_items": "{number} excluded {if number is 1} item {else} items",
         "hide_excluded": "hide excluded items",
-        "additional_tasks": "{number} more {if number is 1} task {else} tasks"
+        "additional_tasks": "{number} more {if number is 1} task {else} tasks",
+        "entity_mode": {
+          "match_direct": "Direct",
+          "match_device": "Device: {name}",
+          "match_area": "Area: {name}",
+          "match_floor": "Floor: {name}",
+          "match_label": "Label: {name}",
+          "affects_entities": "Affects {number} entities",
+          "affects_entities_single": "Affects {number} entity",
+          "toggle_label": "Turn the whole schedule on or off (affects {number} entities)",
+          "toggle_label_single": "Turn the whole schedule on or off (affects {number} entity)"
+        }
       },
       "editor": {
         "repeated_days": "Repeated days",

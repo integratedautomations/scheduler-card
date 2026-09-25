@@ -8,9 +8,15 @@ import { unsafeHTML } from 'lit/directives/unsafe-html';
 import { computeEntityIcon } from "../data/format/compute_entity_icon";
 import { computeDomain } from "../lib/entity";
 
+import { ifDefined } from 'lit/directives/if-defined';
+
 import './scheduler-relative-time';
 import { DEFAULT_PRIMARY_INFO_DISPLAY, DEFAULT_SECONDARY_INFO_DISPLAY } from "../const";
 import { actionTargetEntities, targetEntities } from "../data/actions/target";
+import { EntityScheduleMatch } from "../data/store/subscribe_entity_schedules";
+import { formatEntityMatch } from "../data/format/format_entity_match";
+import { computeScheduleEntities } from "../data/schedule/compute_schedule_entities";
+import { localize } from "../localize/localize";
 
 @customElement("scheduler-item-row")
 export class SchedulerItemRow extends LitElement {
@@ -19,12 +25,21 @@ export class SchedulerItemRow extends LitElement {
   @property() schedule_id!: string;
   @property() schedule!: Schedule;
   @property() config!: CardConfig;
+  /** entity mode only: why this schedule matched the card's entity */
+  @property({ attribute: false }) matchedVia?: EntityScheduleMatch;
+
+  private _affectedCache?: { schedule: Schedule, registries: any[], count: number };
 
   render() {
     try {
       const stateObj = this.hass.states[this.schedule.entity_id!];
       if (!stateObj) return html``;
       const disabled = ['off', 'completed'].includes(stateObj.state);
+      const entityMode = Boolean(this.config.entity_id);
+      const affected = entityMode ? this._affectedEntityCount() : 0;
+      const toggleLabel = entityMode && affected
+        ? localize(`ui.panel.overview.entity_mode.${affected == 1 ? 'toggle_label_single' : 'toggle_label'}`, this.hass, '{number}', String(affected))
+        : undefined;
       const nextAction = this.schedule.entries[0].slots[this.schedule.next_entries[0] || 0].actions[0];
 
       let icon = computeActionIcon(nextAction, this.config.customize);
@@ -54,6 +69,7 @@ export class SchedulerItemRow extends LitElement {
         <div class="secondary">
         ${this.renderDisplayItem(this.config.display_options?.secondary_info || DEFAULT_SECONDARY_INFO_DISPLAY)}
         </div>
+        ${entityMode ? this.renderEntityMatch(affected) : ''}
       </div>
       <div class="state">
         ${this.config.show_toggle_switches !== false
@@ -61,6 +77,8 @@ export class SchedulerItemRow extends LitElement {
               ?checked=${['on', 'triggered'].includes(stateObj.state || '')}
               ?disabled=${stateObj.state == 'completed'}
               @change=${this._toggleEnableDisable}
+              aria-label=${ifDefined(toggleLabel)}
+              title=${ifDefined(toggleLabel)}
             ></ha-switch>`
           : ''}
       </div>
@@ -109,6 +127,33 @@ export class SchedulerItemRow extends LitElement {
       .map(e =>
         html`${replacePreservedTags(e)}<br/>`
       );
+  }
+
+  private renderEntityMatch(affected: number) {
+    const matchLabel = formatEntityMatch(this.matchedVia, this.hass);
+    if (!matchLabel && !affected) return '';
+    return html`
+      <div class="entity-match">
+        ${matchLabel ? html`<span class="match-chip">${matchLabel}</span>` : ''}
+        ${affected
+        ? html`<span class="affects">${localize(`ui.panel.overview.entity_mode.${affected == 1 ? 'affects_entities_single' : 'affects_entities'}`, this.hass, '{number}', String(affected))}</span>`
+        : ''}
+      </div>
+    `;
+  }
+
+  // resolving dynamic targets walks the entity registry, and rows re-render
+  // on every hass update, so reuse the count until the schedule or a
+  // registry actually changes
+  private _affectedEntityCount(): number {
+    const h = this.hass as any;
+    const registries = [h.entities, h.devices, h.areas, h.floors];
+    const cache = this._affectedCache;
+    if (cache && cache.schedule === this.schedule && cache.registries.every((r, i) => r === registries[i]))
+      return cache.count;
+    const count = computeScheduleEntities(this.schedule, this.hass).length;
+    this._affectedCache = { schedule: this.schedule, registries, count };
+    return count;
   }
 
   private _handleItemClick(_ev: Event) {
@@ -234,6 +279,28 @@ export class SchedulerItemRow extends LitElement {
       }
       .defective {
         text-decoration: line-through;
+      }
+      div.entity-match {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      span.match-chip {
+        flex: none;
+        height: 20px;
+        line-height: 20px;
+        padding: 0 8px;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        background: rgba(var(--rgb-primary-color), 0.15);
+        color: var(--primary-color);
+      }
+      span.affects {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.75rem;
+        color: var(--secondary-text-color);
       }
     `;
   }

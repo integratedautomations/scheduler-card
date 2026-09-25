@@ -20,6 +20,10 @@ export const validateConfig = (config: any) => {
     errors.push(`'exclude' must be a list of strings`);
   }
 
+  if (hasKey(config, 'entity_id') && (!isTypeString(config.entity_id) || !/^[a-z0-9_]+\.[a-z0-9_]+$/.test(config.entity_id))) {
+    errors.push(`'entity_id' must be a valid entity ID`);
+  }
+
   if (hasKey(config, 'discover_existing') && !isTypeBoolean(config.discover_existing)) {
     errors.push(`'discover_existing' must be a boolean`);
   }

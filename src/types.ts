@@ -19,6 +19,9 @@ export interface CardConfig {
   tags?: string[] | string;
   exclude_tags?: string[] | string;
   show_add_button?: boolean;
+  /** entity mode: list only the schedules that act on this entity (as
+   * resolved by the backend), in a compact style for embedding */
+  entity_id?: string;
 }
 
 export enum EditorMode {
