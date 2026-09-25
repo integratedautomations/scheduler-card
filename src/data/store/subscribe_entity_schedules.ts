@@ -2,18 +2,17 @@ import { UnsubscribeFunc } from "home-assistant-js-websocket";
 import { HomeAssistant } from "../../lib/types";
 
 /**
- * Backend contract for entity mode (scheduler-component, pending):
- *   scheduler/entity_schedules           { entity_id } -> summaries
- *   scheduler/subscribe_entity_schedules { entity_id } -> summaries, pushed live
- *
- * ASSUMPTIONS to confirm once the backend lands (all shape handling for this
- * contract is kept in this file):
- * - every push carries the complete current list for the entity (not a delta)
- * - a push is either a bare list or an object with a `schedules` list
- * - matched_via.type is one of the EntityMatchType values below
+ * Backend contract for entity mode (scheduler-component README,
+ * "scheduler/entity_schedules" and "scheduler/subscribe_entity_schedules"):
+ * - the subscription pushes `{ schedules: [...] }` with the complete current
+ *   list for the entity, straight away and again whenever it may have
+ *   changed (schedule add/edit/rename/delete/toggle, next-trigger change,
+ *   storage reload, relevant registry changes), coalesced by ~0.25 s
+ * - matched_via.type is the most specific reason:
+ *   entity > device > area > floor > label
  */
 
-export type EntityMatchType = 'direct' | 'device' | 'area' | 'floor' | 'label';
+export type EntityMatchType = 'entity' | 'device' | 'area' | 'floor' | 'label';
 
 export interface EntityScheduleMatch {
   type: EntityMatchType;
@@ -23,7 +22,9 @@ export interface EntityScheduleMatch {
 
 export interface EntityScheduleSummary {
   schedule_id: string;
-  name?: string;
+  /** the schedule's switch entity; null until the switch is created */
+  entity_id?: string | null;
+  name?: string | null;
   enabled?: boolean;
   next_trigger?: string | null;
   matched_via?: EntityScheduleMatch;

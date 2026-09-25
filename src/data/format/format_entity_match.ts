@@ -32,7 +32,8 @@ const lookupName = (match: EntityScheduleMatch, hass: HomeAssistant): string | u
  */
 export const formatEntityMatch = (match: EntityScheduleMatch | undefined, hass: HomeAssistant): string => {
   if (!match || !match.type) return '';
-  if (match.type == 'direct') return localize('ui.panel.overview.entity_mode.match_direct', hass);
+  // the entity is targeted explicitly
+  if (match.type == 'entity') return localize('ui.panel.overview.entity_mode.match_direct', hass);
   const key = matchKeys[match.type];
   if (!key) return '';
   const name = match.name || lookupName(match, hass) || match.id || '';

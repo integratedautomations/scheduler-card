@@ -140,8 +140,9 @@ export class SchedulerCard extends LitElement {
 
   // entity mode: the backend decides which schedules act on the entity (it
   // can resolve area/floor/label/device membership, which local
-  // include/exclude filtering can't); scheduler_updated keeps the content of
-  // the listed schedules fresh between membership pushes
+  // include/exclude filtering can't). It also pushes a fresh list on every
+  // schedule edit, toggle and trigger change, so no scheduler_updated
+  // listener is needed here.
   private hassSubscribeEntity(): Promise<UnsubscribeFunc>[] {
     const entityId = this._config.entity_id!;
     this._subscribedEntity = entityId;
@@ -154,9 +155,6 @@ export class SchedulerCard extends LitElement {
           this.schedules = [];
           return () => { };
         }),
-      this.hass!.connection.subscribeMessage((ev: SchedulerEventData) => this._handleEntityScheduleUpdated(ev), {
-        type: 'scheduler_updated',
-      }),
     ];
   }
 
@@ -170,27 +168,6 @@ export class SchedulerCard extends LitElement {
         this._entityMatches = matches;
         this.schedules = sortSchedules(items.filter(isDefined) as ScheduleStorageEntry[], this._config, this.hass);
       });
-  }
-
-  private _handleEntityScheduleUpdated(ev: SchedulerEventData) {
-    if (!this.schedules) return;
-    if (ev.event == 'scheduler_item_removed') {
-      this.schedules = this.schedules.filter(e => e.schedule_id !== ev.schedule_id);
-      return;
-    }
-    // membership only changes through the entity subscription
-    if (!(ev.schedule_id in this._entityMatches)) return;
-    const loadId = this._entityLoadId;
-    fetchScheduleItem(this.hass!, ev.schedule_id)
-      .then(schedule => {
-        if (!schedule || loadId !== this._entityLoadId || !this.schedules) return;
-        const idx = this.schedules.findIndex(e => e.schedule_id == ev.schedule_id);
-        if (idx < 0) return;
-        const schedules = [...this.schedules];
-        schedules[idx] = schedule;
-        this.schedules = sortSchedules(schedules, this._config, this.hass);
-      })
-      .catch(() => { });
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
