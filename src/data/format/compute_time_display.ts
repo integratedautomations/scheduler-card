@@ -27,29 +27,25 @@ const formatRelativeTimeString = (input: Time, hass: HomeAssistant) => {
   return `${timeString} ${signString} ${eventString}`;
 };
 
+/**
+ * A single time without surrounding wording: "17:00", "5:00 PM" or
+ * "00:15 before sunset".
+ */
+export const formatTimeString = (time: string, hass: HomeAssistant) => {
+  const ts = parseTimeString(time);
+  return ts.mode == TimeMode.Fixed
+    ? timeToString(ts, { am_pm: useAmPm(hass.locale) })
+    : formatRelativeTimeString(ts, hass);
+}
+
 export const computeTimeDisplay = (startTime: string, stopTime: string | undefined, hass: HomeAssistant) => {
-
-  const amPmFormat = useAmPm(hass.locale);
-
   if (stopTime) {
-    const ts_start = parseTimeString(startTime);
-    const ts_stop = parseTimeString(stopTime);
-
-    const startTimeString = ts_start.mode == TimeMode.Fixed
-      ? timeToString(ts_start, { am_pm: amPmFormat })
-      : formatRelativeTimeString(ts_start, hass);
-
-    const stopTimeString = ts_stop.mode == TimeMode.Fixed
-      ? timeToString(ts_stop, { am_pm: amPmFormat })
-      : formatRelativeTimeString(ts_stop, hass);
-
+    const startTimeString = formatTimeString(startTime, hass);
+    const stopTimeString = formatTimeString(stopTime, hass);
     return capitalizeFirstLetter(localize('ui.components.time.interval', hass, ['{startTime}', '{endTime}'], [startTimeString, stopTimeString]));
   }
   else {
-    const ts_start = parseTimeString(startTime);
-    const startTimeString = ts_start.mode == TimeMode.Fixed
-      ? timeToString(ts_start, { am_pm: amPmFormat })
-      : formatRelativeTimeString(ts_start, hass);
+    const startTimeString = formatTimeString(startTime, hass);
     return capitalizeFirstLetter(localize('ui.components.time.absolute', hass, '{time}', startTimeString));
   }
 }

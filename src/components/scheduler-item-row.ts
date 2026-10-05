@@ -265,6 +265,32 @@ export class SchedulerItemRow extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .secondary .slots-list {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 6px;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+      .slot-row {
+        /* same shared-grid trick as .condition-row, so times line up */
+        display: contents;
+      }
+      .slot-time {
+        white-space: nowrap;
+        border-right: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+        padding-right: 6px;
+      }
+      .slot-action {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .slot-row.next > span {
+        color: var(--primary-text-color);
+        font-weight: 500;
+      }
       span.tag {
         height: 28px;
         border-radius: 14px;

@@ -9,6 +9,25 @@ import { capitalizeFirstLetter } from "../../lib/capitalize_first_letter";
 import { formatWeekdayDisplay } from "../days";
 import { computeEntityDisplay } from "./compute_entity_display";
 import { formatConditionsDisplay } from "./format_condition_display";
+import { formatTimeString } from "./compute_time_display";
+import { formatActionsShort } from "./format_action_short";
+
+/**
+ * All slots of a time scheme as rows of "time | action", picked up by
+ * scheduler-item-row's unsafeHTML rendering and styled by its '.slot-*' CSS.
+ */
+const formatSlotsDisplay = (schedule: Schedule, hass: HomeAssistant): string => {
+  const nextSlot = schedule.next_entries[0] || 0;
+  const rows = schedule.entries[0].slots
+    .map((slot, i) => {
+      const time = slot.stop
+        ? `${formatTimeString(slot.start, hass)} - ${formatTimeString(slot.stop, hass)}`
+        : formatTimeString(slot.start, hass);
+      return `<div class="slot-row${i == nextSlot ? ' next' : ''}"><span class="slot-time">${time}</span><span class="slot-action">${formatActionsShort(slot.actions, hass)}</span></div>`;
+    })
+    .join('');
+  return `<div class="slots-list">${rows}</div>`;
+};
 
 
 export const computeScheduleDisplay = (schedule: Schedule, config: (DisplayItem | string)[] | DisplayItem | string, hass: HomeAssistant, customize?: CustomConfig): string[] => {
@@ -53,6 +72,8 @@ export const computeScheduleDisplay = (schedule: Schedule, config: (DisplayItem 
         const conditionSlot = schedule.entries[0].slots[schedule.next_entries[0] || 0];
         return formatConditionsDisplay(conditionSlot?.conditions, hass, customize);
       case DisplayItem.Time:
+        // time schemes: every slot on its own row, the next one highlighted
+        if (schedule.entries[0].slots.length > 1) return formatSlotsDisplay(schedule, hass);
         const slot = schedule.entries[0].slots[schedule.next_entries[0] || 0];
         const timeDisplay = computeTimeDisplay(slot.start, slot.stop, hass);
         if (timeDisplay && timeDisplay.trim()) return capitalizeFirstLetter(timeDisplay);

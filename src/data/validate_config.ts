@@ -24,6 +24,10 @@ export const validateConfig = (config: any) => {
     errors.push(`'entity_id' must be a valid entity ID`);
   }
 
+  if (hasKey(config, 'scheme_view') && !['timeline', 'list'].includes(config.scheme_view)) {
+    errors.push(`'scheme_view' must be either 'timeline' or 'list'`);
+  }
+
   if (hasKey(config, 'discover_existing') && !isTypeBoolean(config.discover_existing)) {
     errors.push(`'discover_existing' must be a boolean`);
   }

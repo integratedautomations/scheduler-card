@@ -161,6 +161,28 @@ export class SchedulerCardEditor extends LitElement {
           </div>
         </div>
 
+        <span>${localize('ui.panel.card_editor.fields.scheme_view.heading', this.hass)}</span>
+        <div class="two-columns">
+          <div class="column radio"
+            @click=${() => { this._updateConfig({ scheme_view: 'timeline' }) }}
+          >
+            <ha-icon
+              icon="${this._config.scheme_view != 'list' ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank'}"
+              class="${this._config.scheme_view != 'list' ? 'checked' : ''}"
+            ></ha-icon>
+            <span>${localize('ui.panel.card_editor.fields.scheme_view.options.timeline', this.hass)}</span>
+          </div>
+          <div class="column radio"
+            @click=${() => { this._updateConfig({ scheme_view: 'list' }) }}
+          >
+            <ha-icon
+              icon="${this._config.scheme_view == 'list' ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank'}"
+              class="${this._config.scheme_view == 'list' ? 'checked' : ''}"
+            ></ha-icon>
+            <span>${localize('ui.panel.card_editor.fields.scheme_view.options.list', this.hass)}</span>
+          </div>
+        </div>
+
           <span slot="heading">${localize('ui.panel.card_editor.fields.sort_by.heading', this.hass)}</span>
 
         <div class="two-columns">

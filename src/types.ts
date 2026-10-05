@@ -22,7 +22,12 @@ export interface CardConfig {
   /** entity mode: list only the schedules that act on this entity (as
    * resolved by the backend), in a compact style for embedding */
   entity_id?: string;
+  /** which slot picker the scheme editor opens with (a choice the user
+   * switches to in the editor is remembered per browser and wins) */
+  scheme_view?: SchemeView;
 }
+
+export type SchemeView = 'timeline' | 'list';
 
 export enum EditorMode {
   Single = 'single',

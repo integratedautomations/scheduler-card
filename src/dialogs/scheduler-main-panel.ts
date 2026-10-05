@@ -1,7 +1,7 @@
-import { mdiCalendarEdit, mdiChevronLeft, mdiChevronRight, mdiDotsVertical, mdiPencil, mdiShapeRectanglePlus, mdiTrashCanOutline } from "@mdi/js";
+import { mdiCalendarEdit, mdiChartTimelineVariant, mdiChevronLeft, mdiChevronRight, mdiDotsVertical, mdiFormatListBulleted, mdiPencil, mdiShapeRectanglePlus, mdiTrashCanOutline } from "@mdi/js";
 import { CSSResultGroup, LitElement, PropertyValues, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators";
-import { Action, CardConfig, EditorMode, Schedule, ScheduleEntry, TWeekday, Target, Time, Timeslot } from "../types";
+import { Action, CardConfig, EditorMode, Schedule, ScheduleEntry, SchemeView, TWeekday, Target, Time, Timeslot } from "../types";
 import { actionConfig } from "../data/actions/action_config";
 import { formatWeekdayDisplay } from "../data/days";
 import { defaultSelectorValue } from "../data/selectors/default_selector_value";
@@ -40,6 +40,18 @@ import '../components/scheduler-collapsible-section';
 import '../components/scheduler-settings-row';
 import '../components/scheduler-conditions-editor';
 import '../components/scheduler-combo-selector';
+import '../components/scheduler-timeslot-list';
+
+const SCHEME_VIEW_STORAGE_KEY = 'scheduler-card.scheme_view';
+
+const readStoredSchemeView = (): SchemeView | undefined => {
+  try {
+    const value = localStorage.getItem(SCHEME_VIEW_STORAGE_KEY);
+    return value == 'timeline' || value == 'list' ? value : undefined;
+  } catch (_e) {
+    return undefined;
+  }
+};
 
 @customElement('scheduler-main-panel')
 export class SchedulerMainPanel extends LitElement {
@@ -52,6 +64,7 @@ export class SchedulerMainPanel extends LitElement {
   @state() schedule!: Schedule;
   @state() expandedAction: number = 0;
   @state() selectedEntry: number | null = 0;
+  @state() private _schemeView?: SchemeView;
 
   shouldUpdate(changedProps: PropertyValues): boolean {
     if (changedProps.get('schedule')) {
@@ -101,9 +114,20 @@ export class SchedulerMainPanel extends LitElement {
       <div class="editor-header">
         <div class="weekdays">
           ${this.hass.localize('ui.dialogs.helper_settings.input_datetime.time')}:
+          ${this.renderSchemeViewToggle()}
         </div>
         ${this.renderActionButtons()}
       </div>
+      ${this.schemeView == 'list' ? html`
+      <scheduler-timeslot-list
+        .hass=${this.hass}
+        .config=${this.config}
+        .schedule=${entry}
+        .selectedSlot=${this.selectedSlot}
+        @update=${(ev: CustomEvent) => this._handleUpdate(ev, num)}
+      >
+      </scheduler-timeslot-list>
+      ` : html`
       <scheduler-timeslot-editor
         .hass=${this.hass}
         .config=${this.config}
@@ -113,6 +137,7 @@ export class SchedulerMainPanel extends LitElement {
         .large=${this.large}
       >
       </scheduler-timeslot-editor>
+      `}
       ` :
         html`
           ${this.hass.localize('ui.dialogs.helper_settings.input_datetime.time')}:
@@ -137,6 +162,41 @@ export class SchedulerMainPanel extends LitElement {
       @change=${this._conditionsChanged}
     >
     </scheduler-conditions-editor>
+    `;
+  }
+
+  // timeline or list slot picker: the choice the user last switched to in
+  // this browser wins, then the card's scheme_view, then the timeline
+  private get schemeView(): SchemeView {
+    return this._schemeView || readStoredSchemeView() || this.config.scheme_view || 'timeline';
+  }
+
+  private _setSchemeView(view: SchemeView) {
+    this._schemeView = view;
+    try {
+      localStorage.setItem(SCHEME_VIEW_STORAGE_KEY, view);
+    } catch (_e) {
+      // storage unavailable (private mode, blocked): the switch still applies to this edit
+    }
+  }
+
+  renderSchemeViewToggle() {
+    const view = this.schemeView;
+    return html`
+      <div class="view-toggle">
+        <ha-icon-button
+          class=${view == 'timeline' ? 'active' : ''}
+          .path=${mdiChartTimelineVariant}
+          .label=${localize('ui.panel.editor.view_timeline', this.hass)}
+          @click=${() => this._setSchemeView('timeline')}
+        ></ha-icon-button>
+        <ha-icon-button
+          class=${view == 'list' ? 'active' : ''}
+          .path=${mdiFormatListBulleted}
+          .label=${localize('ui.panel.editor.view_list', this.hass)}
+          @click=${() => this._setSchemeView('list')}
+        ></ha-icon-button>
+      </div>
     `;
   }
 
@@ -621,6 +681,23 @@ export class SchedulerMainPanel extends LitElement {
     display: flex;
     flex-direction: column;
     flex: 0 0 215px;
+  }
+  div.view-toggle {
+    display: inline-flex;
+    margin-inline-start: 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 20px;
+  }
+  div.view-toggle ha-icon-button {
+    --mdc-icon-button-size: 32px;
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+  }
+  div.view-toggle ha-icon-button.active {
+    color: var(--primary-color);
+  }
+  scheduler-timeslot-list {
+    margin: 8px 0;
   }
   div.editor-header {
     display: flex;

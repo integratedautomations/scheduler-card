@@ -135,6 +135,14 @@
         "excluded_items": "{number} excluded {if number is 1} item {else} items",
         "hide_excluded": "hide excluded items",
         "additional_tasks": "{number} more {if number is 1} task {else} tasks",
+        "short_action": {
+          "on": "On",
+          "off": "Off",
+          "toggle": "Toggle",
+          "set": "Set",
+          "run": "Run",
+          "send": "Send"
+        },
         "entity_mode": {
           "match_direct": "Direct",
           "match_device": "Device: {name}",
@@ -156,6 +164,9 @@
         "select_timeslot": "Select a timeslot",
         "toggle_single_mode": "To single mode",
         "toggle_scheme_mode": "To scheme mode",
+        "view_timeline": "Timeline view",
+        "view_list": "List view",
+        "no_action": "No action",
         "validation_errors": {
           "overlapping_time": "Schedule has overlapping timeslots",
           "missing_target_entity": "One or more actions are missing a target entity",
@@ -225,6 +236,13 @@
             "options": {
               "single": "Single schedule mode",
               "scheme": "Time scheme mode"
+            }
+          },
+          "scheme_view": {
+            "heading": "Default view in scheme mode",
+            "options": {
+              "timeline": "Timeline",
+              "list": "List"
             }
           },
           "sort_by": {
