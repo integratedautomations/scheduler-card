@@ -122,10 +122,15 @@ export class SchedulerItemRow extends LitElement {
       return unsafeHTML(input);
     };
 
+    // the slot and condition lists are block elements that already end their
+    // own line; a <br/> after them would add an empty line below
+    const isBlock = (input: string) =>
+      input.startsWith('<div class="slots-list">') || input.startsWith('<div class="conditions-list">');
+
     return computeScheduleDisplay(this.schedule, displayItem, this.hass, this.config.customize)
       .filter(e => e.length)
       .map(e =>
-        html`${replacePreservedTags(e)}<br/>`
+        isBlock(e) ? html`${replacePreservedTags(e)}` : html`${replacePreservedTags(e)}<br/>`
       );
   }
 
