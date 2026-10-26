@@ -8,6 +8,7 @@ import { computeDayDisplay } from '../data/format/compute_days_display';
 import { computeStartOfWeek } from '../data/days';
 import { capitalizeFirstLetter } from '../lib/capitalize_first_letter';
 import { hassLocalize } from '../localize/hassLocalize';
+import '../components/scheduler-list';
 
 export type DialogSelectWeekdayParams = {
   weekdays: TWeekday[];
@@ -71,9 +72,9 @@ export class DialogSelectWeekdays extends LitElement {
           </div>
         </ha-dialog-header>
         <div class="wrapper">
-          <ha-list>
+          <scheduler-list>
           ${this._renderWeekdayOptions()}
-          </ha-list>
+          </scheduler-list>
         </div>
 
         <ha-dialog-footer slot="footer">
@@ -134,7 +135,7 @@ export class DialogSelectWeekdays extends LitElement {
 
     return listOptions.map((key) => {
       return html`
-        <ha-list-item
+        <scheduler-list-item
           graphic="icon"
           @click=${this._toggleSelectOption}
           option="${key}"
@@ -156,7 +157,7 @@ export class DialogSelectWeekdays extends LitElement {
           ? html`<ha-icon slot="meta" icon="mdi:chevron-right"></ha-icon>`
           : ''
         }
-        </ha-list-item>
+        </scheduler-list-item>
     `})
   }
 
@@ -203,13 +204,13 @@ export class DialogSelectWeekdays extends LitElement {
         color: var(--primary-text-color);
         padding: 0px 12px;
       }
-      ha-list {
+      scheduler-list {
         --mdc-list-vertical-padding: 0px;
       }
-      ha-list-item[disabled] {
+      scheduler-list-item[disabled] {
         color: var(--disabled-text-color);
       }
-      ha-list-item.nested {
+      scheduler-list-item.nested {
         --mdc-list-side-padding: 36px;
       }
       .badge {
