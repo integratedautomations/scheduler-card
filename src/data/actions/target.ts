@@ -1,30 +1,67 @@
 import { HomeAssistant } from "../../lib/types";
-import { Action, CardConfig, Target, TargetFilter, TargetKey, TARGET_KEYS } from "../../types";
+import { Action, CardConfig, Target, TargetFilter, TargetKey, TargetSelection, TARGET_KEYS } from "../../types";
 import { entityIncludedByConfig } from "./entity_included_by_config";
 import { computeDomain, friendlyName } from "../../lib/entity";
+import { localize } from "../../localize/localize";
 
-/** coerce every present target key to a sorted, de-duplicated string[] and
- * drop empty keys; returns undefined for an effectively empty target */
-export const normalizeTarget = (target?: Target | null): Target | undefined => {
-  if (!target) return undefined;
-  let output: Target = {};
+const normalizeSelection = (selection?: TargetSelection | null): TargetSelection | undefined => {
+  if (!selection) return undefined;
+  let output: TargetSelection = {};
   TARGET_KEYS.forEach(key => {
-    const value = [target[key] || []].flat().filter(e => e);
+    const value = [selection[key] || []].flat().filter(e => e);
     if (value.length) output = { ...output, [key]: [...new Set(value)].sort() };
   });
   return Object.keys(output).length ? output : undefined;
 };
 
+/** coerce every present target key to a sorted, de-duplicated string[] and
+ * drop empty keys; returns undefined for an effectively empty target.
+ * An `exclude` block (HA 2026.11) is normalized the same way and kept only
+ * while there is something to exclude from, as HA and the backend do. */
+export const normalizeTarget = (target?: Target | null): Target | undefined => {
+  const output: Target | undefined = normalizeSelection(target);
+  if (!output) return undefined;
+  const exclude = normalizeSelection(target?.exclude);
+  return exclude ? { ...output, exclude } : output;
+};
+
 export const isEmptyTarget = (target?: Target | null): boolean =>
   normalizeTarget(target) === undefined;
 
-/** target contains device/area/floor/label references whose entity
- * membership is resolved at execution time by the backend */
+/** target contains device/area/floor/label references, or exclusions,
+ * whose entity membership is resolved at execution time by the backend */
 export const targetIsDynamic = (target?: Target | null): boolean => {
   const normalized = normalizeTarget(target);
   if (!normalized) return false;
+  if (normalized.exclude) return true;
   return (<TargetKey[]>['device_id', 'area_id', 'floor_id', 'label_id'])
     .some(key => (normalized[key] || []).length);
+};
+
+/** target without its exclude block, e.g. for a backend that can't store one */
+export const withoutExclude = (target?: Target | null): Target | undefined => {
+  const normalized = normalizeTarget(target);
+  if (!normalized || !normalized.exclude) return normalized;
+  const { exclude: _exclude, ...rest } = normalized;
+  return rest;
+};
+
+/** whether the scheduler backend understands target exclusions: asked once
+ * per connection by previewing a target with an exclude block (backends
+ * without support reject the block). Card and backend are updated
+ * separately, so the editor only offers exclusions when they can be saved. */
+const excludeSupport = new WeakMap<object, Promise<boolean>>();
+export const backendSupportsExclude = (hass: HomeAssistant): Promise<boolean> => {
+  const key = hass.connection as object;
+  if (!excludeSupport.has(key)) {
+    excludeSupport.set(key, hass
+      .callWS({
+        type: 'scheduler/resolve_target',
+        target: { entity_id: ['sun.sun'], exclude: { entity_id: ['sun.sun'] } },
+      })
+      .then(() => true, () => false));
+  }
+  return excludeSupport.get(key)!;
 };
 
 export const targetEntities = (target?: Target | null): string[] =>
@@ -67,6 +104,17 @@ export const resolveTargetLocal = (hass: HomeAssistant, target?: Target | null, 
   const normalized = normalizeTarget(target);
   if (!normalized) return [];
 
+  const resolved = expandSelectionLocal(hass, normalized, domain, filter);
+  // like the backend (and HA): an exclusion takes out every entity of the
+  // excluded item, explicit ones included, whatever the domain or filter
+  if (normalized.exclude) {
+    const excluded = expandSelectionLocal(hass, normalized.exclude);
+    excluded.forEach(entityId => resolved.delete(entityId));
+  }
+  return [...resolved].sort();
+};
+
+const expandSelectionLocal = (hass: HomeAssistant, normalized: TargetSelection, domain?: string, filter?: TargetFilter | null): Set<string> => {
   const entities = (hass as any).entities || {};
   const devices = (hass as any).devices || {};
   const areas = (hass as any).areas || {};
@@ -106,7 +154,7 @@ export const resolveTargetLocal = (hass: HomeAssistant, target?: Target | null, 
     resolved.add(entry.entity_id);
   });
 
-  return [...resolved].sort();
+  return resolved;
 };
 
 /** entities to derive selector configuration and display from: explicit
@@ -128,19 +176,28 @@ export const representativeEntity = (hass: HomeAssistant, action: Action): strin
 };
 
 /** short human-readable description of a target's references, e.g.
- * "Kitchen, First floor, 2 more" — uses registry names where available */
+ * "Kitchen, First floor, +2", or "Ground floor except Kitchen" for a target
+ * with exclusions — uses registry names where available */
 export const describeTarget = (hass: HomeAssistant, target?: Target | null, maxItems = 3): string => {
   const normalized = normalizeTarget(target);
   if (!normalized) return '';
 
+  const names = describeSelection(hass, normalized, maxItems);
+  if (!normalized.exclude) return names;
+  return localize('ui.components.target.except', hass, ['{targets}', '{excluded}'],
+    [names, describeSelection(hass, normalized.exclude, maxItems)]);
+};
+
+const describeSelection = (hass: HomeAssistant, normalized: TargetSelection, maxItems: number): string => {
   const areas = (hass as any).areas || {};
   const devices = (hass as any).devices || {};
   const floors = (hass as any).floors || {};
+  const labels = (hass as any).labels || {};
 
   const names: string[] = [
     ...[normalized.floor_id || []].flat().map(e => floors[e]?.name || e),
     ...[normalized.area_id || []].flat().map(e => areas[e]?.name || e),
-    ...[normalized.label_id || []].flat(),
+    ...[normalized.label_id || []].flat().map(e => labels[e]?.name || e),
     ...[normalized.device_id || []].flat().map(e => devices[e]?.name_by_user || devices[e]?.name || e),
     ...[normalized.entity_id || []].flat().map(e => hass.states[e] ? friendlyName(e, hass.states[e].attributes) : e),
   ];

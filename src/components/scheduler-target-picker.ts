@@ -7,12 +7,14 @@ import { CardConfig, Target, TargetFilter } from "../types";
 import { localize } from "../localize/localize";
 import { loadHaForm } from "../lib/load_ha_form";
 import {
+  backendSupportsExclude,
   buildTargetFilter,
   isEmptyTarget,
   normalizeTarget,
   resolveTarget,
   resolveTargetLocal,
   targetIsDynamic,
+  withoutExclude,
 } from "../data/actions/target";
 import { entityIncludedByConfig } from "../data/actions/entity_included_by_config";
 
@@ -33,7 +35,11 @@ import { entityIncludedByConfig } from "../data/actions/entity_included_by_confi
  *
  * Emits `value-changed` with a normalized Target object:
  * { entity_id?: string[], device_id?: string[], area_id?: string[],
- *   floor_id?: string[], label_id?: string[] }
+ *   floor_id?: string[], label_id?: string[], exclude?: {same keys} }
+ *
+ * Exclusions ("Exclude target", HA 2026.11) are offered when the scheduler
+ * backend can store them; with an older backend they are left out, so a
+ * schedule never fails to save.
  *
  * Shows a live "targets N entities" summary resolved by the backend's
  * resolve_target() (with client-side fallback), so the preview matches
@@ -67,6 +73,9 @@ export class SchedulerTargetPicker extends LitElement {
 
   @state() private _mode: 'loading' | 'native' | 'selector' | 'unavailable' = 'loading';
 
+  /** the backend can store target exclusions */
+  @state() private _allowExclude = false;
+
   private _resolveJob = 0;
 
   protected async firstUpdated() {
@@ -77,6 +86,7 @@ export class SchedulerTargetPicker extends LitElement {
     } catch (e) { /* fall through to availability checks */ }
 
     this._computeMode();
+    backendSupportsExclude(this.hass).then(supported => { this._allowExclude = supported; });
 
     if (this._mode == 'selector') {
       // rendering ha-selector with a target selector makes HA import
@@ -142,6 +152,7 @@ export class SchedulerTargetPicker extends LitElement {
             .includeDomains=${this.domain ? [this.domain] : undefined}
             .entityFilter=${this._entityFilter}
             .deviceFilter=${this._deviceFilter}
+            .allowExclude=${this._allowExclude}
             ?disabled=${this.disabled}
             @value-changed=${this._valueChanged}
           ></ha-target-picker>`
@@ -201,7 +212,11 @@ export class SchedulerTargetPicker extends LitElement {
 
   private _valueChanged(ev: CustomEvent) {
     ev.stopPropagation();
-    const target = normalizeTarget(ev.detail.value as Target);
+    // HA's own target selector (the fallback path) always offers exclusions;
+    // drop them when the backend couldn't store them
+    const target = this._allowExclude
+      ? normalizeTarget(ev.detail.value as Target)
+      : withoutExclude(ev.detail.value as Target);
     this.value = target || {};
     fireEvent(this, 'value-changed', { value: isEmptyTarget(target) ? undefined : target });
   }

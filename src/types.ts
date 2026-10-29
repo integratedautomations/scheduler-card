@@ -71,12 +71,18 @@ export interface ScheduleEntry {
  * `selector: { target: {...} }` in HA's automation/script editor.
  * Values may be a scalar or a list (HA components emit both);
  * use normalizeTarget() before persisting or comparing. */
-export interface Target {
+export interface TargetSelection {
   entity_id?: string[] | string;
   device_id?: string[] | string;
   area_id?: string[] | string;
   floor_id?: string[] | string;
   label_id?: string[] | string;
+}
+
+export interface Target extends TargetSelection {
+  /** things to leave out of the target again (HA 2026.11 "Exclude target"),
+   * same keys as the target; resolved by the backend on every run */
+  exclude?: TargetSelection;
 }
 
 export const TARGET_KEYS = ['entity_id', 'device_id', 'area_id', 'floor_id', 'label_id'] as const;

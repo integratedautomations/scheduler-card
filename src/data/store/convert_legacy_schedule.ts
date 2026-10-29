@@ -135,10 +135,15 @@ const computeUniqueActions = (actions: Action[]): Action[] => {
   //differing service/service_data remain separate list entries
   if (actions.length <= 1) return actions;
 
+  // actions whose targets exclude different things can't share one target
+  const sameExclude = (a: Action, b: Action) =>
+    deepCompare(normalizeTarget(a.target)?.exclude || {}, normalizeTarget(b.target)?.exclude || {});
+
   let groups: Action[][] = [];
   actions.forEach(action => {
     const group = groups.find(g =>
       deepCompare({ ...g[0], target: undefined, target_filter: undefined }, { ...action, target: undefined, target_filter: undefined })
+      && sameExclude(g[0], action)
     );
     if (group) group.push(action);
     else groups.push([action]);
@@ -151,6 +156,8 @@ const computeUniqueActions = (actions: Action[]): Action[] => {
       const values = [...new Set(group.map(e => [e.target?.[key] || []].flat()).flat())];
       if (values.length) merged = { ...merged, [key]: values.sort() };
     });
+    const exclude = normalizeTarget(group[0].target)?.exclude;
+    if (exclude) merged = { ...merged, exclude };
     let output: Action = { ...group[0], target: merged };
     const filter = group.map(e => e.target_filter).find(e => e);
     if (filter) output = { ...output, target_filter: filter };
